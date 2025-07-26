@@ -1,0 +1,15 @@
+# Default ignored files
+/shelf/
+/workspace.xml
+# Editor-based HTTP Client requests
+/httpRequests/
+# Datasource local storage ignored files
+/dataSources/
+/dataSources.local.xml
+# Add these lines to your .gitignore file
+*.iml
+.idea/
+misc.xml
+modules.xml
+profiles_settings.xml
+vcs.xml
