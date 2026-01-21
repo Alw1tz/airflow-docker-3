@@ -1,0 +1,47 @@
+# Airflow logs
+logs/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.tar
+
+# Airflow specific
+airflow.db
+airflow.cfg
+unittests.cfg
+webserver_config.py
+
+# Plugins compiled
+plugins/__pycache__/
+
+# Config files with secrets (keep template)
+config/airflow_local_settings.py
