@@ -2,6 +2,9 @@
 logs/
 *.log
 
+# Airflow config (auto-generated)
+config/
+
 # Python
 __pycache__/
 *.py[cod]
@@ -42,6 +45,3 @@ webserver_config.py
 
 # Plugins compiled
 plugins/__pycache__/
-
-# Config files with secrets (keep template)
-config/airflow_local_settings.py
