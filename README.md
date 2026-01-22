@@ -1,6 +1,6 @@
-# Apache Airflow 3.1.6 Docker Setup with Snowflake
+# Apache Airflow 3.0.6 Docker Setup with Snowflake
 
-Production-ready Apache Airflow 3.1.6 setup using Docker Compose with Snowflake integration.
+Production-ready Apache Airflow 3.0.6 setup using Docker Compose with LocalExecutor and Snowflake integration.
 
 ## Prerequisites
 
@@ -25,10 +25,10 @@ git clone https://github.com/your-username/airflow-docker-3.git
 cd airflow-docker-3
 ```
 
-### 2. Initialize Environment (Linux/Mac)
+### 2. Initialize Environment (Linux/Mac only)
 
 ```bash
-# Set your user ID (Linux only)
+# Set your user ID (Linux only - Windows users skip this)
 echo "AIRFLOW_UID=$(id -u)" >> .env
 ```
 
@@ -38,16 +38,13 @@ echo "AIRFLOW_UID=$(id -u)" >> .env
 # Build the custom image with Snowflake provider
 docker compose build
 
-# Initialize the database and create admin user
-docker compose up airflow-init
-
-# Start all services in detached mode
+# Start all services (init runs automatically)
 docker compose up -d
 ```
 
 ### 4. Access Airflow
 
-Open your browser and navigate to:
+Wait about 1 minute for initialization, then open your browser:
 
 - **Airflow UI**: http://localhost:8080
 - **Username**: `airflow`
@@ -63,7 +60,7 @@ Open your browser and navigate to:
 |-------|-------|
 | Connection Id | `conn_id_snowflake` |
 | Connection Type | `Snowflake` |
-| Host | `your-account.region.snowflakecomputing.com` |
+| Account | `your-account-identifier` (e.g., `abc12345` - NO region needed) |
 | Login | `your_username` |
 | Password | `your_password` |
 | Schema | `PUBLIC` |
@@ -72,14 +69,15 @@ Open your browser and navigate to:
 
 ```json
 {
-  "account": "your_account_id",
-  "warehouse": "your_warehouse",
-  "database": "your_database",
-  "role": "your_role"
+  "warehouse": "COMPUTE_WH",
+  "database": "YOUR_DATABASE",
+  "role": "SYSADMIN"
 }
 ```
 
 4. Click **Save**
+
+**Important**: For the Account field, use only your account identifier (e.g., `xjasplf-dfb59392`). Do NOT include the region or `.snowflakecomputing.com` - Snowflake routes automatically.
 
 ### Test the Connection
 
@@ -94,27 +92,28 @@ Open your browser and navigate to:
 airflow-docker-3/
 ├── docker-compose.yaml     # Main Docker Compose configuration
 ├── Dockerfile              # Custom image with Snowflake provider
+├── requirements.txt        # Python dependencies
 ├── .env                    # Environment variables
 ├── .gitignore              # Git ignore rules
 ├── dags/                   # Your DAG files go here
-│   └── test_snowflake.py   # Example Snowflake test DAG
+│   ├── test_snowflake.py   # Snowflake test DAG
+│   └── simple_test.py      # Simple test DAG
 ├── logs/                   # Task execution logs (auto-generated)
 ├── plugins/                # Custom Airflow plugins
-└── config/                 # Custom Airflow configuration
+└── config/                 # Custom Airflow configuration (auto-generated)
 ```
 
 ## Services Overview
 
 | Service | Description | Port |
 |---------|-------------|------|
-| airflow-api-server | Web UI and REST API | 8080 |
+| airflow-apiserver | Web UI and REST API | 8080 |
 | airflow-scheduler | Monitors and triggers tasks | - |
 | airflow-dag-processor | Parses DAG files | - |
-| airflow-worker | Executes tasks | - |
 | airflow-triggerer | Handles deferrable tasks | - |
-| postgres | Metadata database | 5432 |
-| redis | Message broker | 6379 |
-| flower | Celery monitoring (optional) | 5555 |
+| postgres | Metadata database | - |
+
+This setup uses **LocalExecutor** (no Redis/Celery needed) for simpler deployment.
 
 ## Useful Commands
 
@@ -139,7 +138,7 @@ docker compose logs -f
 
 # Specific service
 docker compose logs -f airflow-scheduler
-docker compose logs -f airflow-worker
+docker compose logs -f airflow-apiserver
 ```
 
 ### Access Container Shell
@@ -156,18 +155,13 @@ docker compose exec airflow-scheduler airflow tasks list test_snowflake_connecti
 ### Rebuild After Changes
 
 ```bash
-# Rebuild image after Dockerfile changes
-docker compose build
+# Rebuild image after Dockerfile/requirements.txt changes
+docker compose build --no-cache
 
 # Rebuild and restart
-docker compose up -d --build
-```
-
-### Enable Flower (Celery Monitoring)
-
-```bash
-docker compose --profile flower up -d
-# Access at http://localhost:5555
+docker compose down -v
+docker compose build --no-cache
+docker compose up -d
 ```
 
 ## Adding New DAGs
@@ -214,13 +208,15 @@ ports:
 
 ### "Incorrect username or password" (Snowflake)
 
-- Verify your Snowflake credentials
-- Use account ID only, not the full URL
+- Use account identifier only (e.g., `abc12345`), NOT the full URL
+- Do NOT include region in the account field
 - Ensure the role has appropriate permissions
 
-### "externalbrowser not supported" (Snowflake)
+### SSL Certificate Error (Snowflake)
 
-SSO/MFA authentication isn't supported in Docker. Use username/password authentication instead.
+If you see "hostname doesn't match certificate":
+- Remove any region from the Account field
+- Use just the account identifier (e.g., `xjasplf-dfb59392`)
 
 ### DAGs not appearing
 
@@ -228,18 +224,31 @@ SSO/MFA authentication isn't supported in Docker. Use username/password authenti
 2. View DAG processor logs: `docker compose logs airflow-dag-processor`
 3. Ensure the file has `.py` extension
 
+### Tasks fail with "Connection refused" or no logs
+
+This usually means internal API communication issues. Ensure all services are healthy:
+```bash
+docker compose ps
+```
+
+If services keep restarting, check the logs and do a fresh start:
+```bash
+docker compose down -v
+docker compose build --no-cache
+docker compose up -d
+```
+
 ### Reset Everything
 
 ```bash
 # Stop and remove all containers and volumes
 docker compose down -v
 
-# Remove built images
-docker compose down --rmi all -v
+# Remove built images (optional)
+docker compose down --rmi local -v
 
 # Start fresh
-docker compose build
-docker compose up airflow-init
+docker compose build --no-cache
 docker compose up -d
 ```
 
@@ -252,7 +261,14 @@ Key variables in `.env`:
 | `AIRFLOW_UID` | User ID for file permissions | `50000` |
 | `_AIRFLOW_WWW_USER_USERNAME` | Admin username | `airflow` |
 | `_AIRFLOW_WWW_USER_PASSWORD` | Admin password | `airflow` |
-| `_PIP_ADDITIONAL_REQUIREMENTS` | Extra pip packages | (empty) |
+
+## Configuration Details
+
+This setup uses:
+- **Airflow 3.0.6** - Stable version
+- **LocalExecutor** - Simple, no Redis/Celery required
+- **FAB Auth Manager** - Traditional Flask-AppBuilder authentication
+- **PostgreSQL 13** - Metadata database
 
 ## Resources
 
